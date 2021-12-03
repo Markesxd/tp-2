@@ -10,7 +10,7 @@ int main(){
     fat = (uint16_t*) malloc(sizeof(uint16_t) * 4096);
     data_cluster *clusters;
     clusters = (data_cluster*) malloc(sizeof(data_cluster) * 4087);
-
+    int i = 0;
     char escolha[10];
     do{
     printf(">");
@@ -32,6 +32,11 @@ int main(){
         break;
 
         case MKDIR:
+            if(i % 2 == 0){
+                clusters->data[0] 10;
+            } else {
+                clusters->dir->attributes = 1;
+            }
             printf("mkdir\n");
         break;
 
@@ -89,17 +94,84 @@ void printFat(uint16_t *fat){
     }
 }
 
-void makeDir(data_cluster **data_cluster){
-    
+// void makeDir(data_cluster **dataCluster, uint16_t *fat, char* path){
+//     int dirI = navegate(dataCluster, path);
+//     int i = 0;
+//     strcpy((*dataCluster)[dirI].dir->filename, name); 
+//     while(fat[i] != 0x0) i++;
+//     fat[i] = 0xffff;
+// }
+
+int navigate(data_cluster *dataCluster, char* path){
+    int k = 0, dirI = 0;
+    char name[18];
+    for(int j = 1; j < strlen(path); j++){
+        if(path[j] == '/') {
+            dirI = navegate1(name, dataCluster[dirI]);
+            k = 0;
+        };    
+        name[k++] = path[j];
+    }
+    return dirI;
 }
+
+int navegate1(char name[18], data_cluster cluster){
+    for(int i = 0; i < 32; i++){
+        if(strcmp(cluster.dir[i].filename, name) == 0) return i;
+    }
+    printf("Diretorio ou arquivo nao encontrado\n");
+}
+//fat.part
+
+void dataFlush(data_cluster *data_cluster, uint16_t *fat){
+    FILE *pont_arq;
+    pont_arq = fopen("fat.part", "wb"); //create binary file
+
+    if (pont_arq == NULL){ //error file
+        printf("arquivo com problemas");
+    }
+    fwrite(fat, 4096, sizeof(fat), pont_arq);
+    fwrite(data_cluster, 4087, sizeof(data_cluster), pont_arq);
+    fclose(pont_arq);
+}
+
+void readFile(data_cluster **data_cluster, uint16_t **fat){
+    FILE *pont_arq;
+    pont_arq = fopen("fat.part","rb");
+    
+    if(pont_arq == NULL){
+        printf("Erro ao ler arquivo");
+    }
+    fread(fat, sizeof(fat), 4096, pont_arq);
+    fread(data_cluster,sizeof(data_cluster), 4087,pont_arq);
+    fclose(pont_arq);
+}
+
+// void ls(data_cluster *dataCluster, char* path){
+//     int ID = navigate(dataCluster, path);
+//     for(int i = 0; i < 32; i++){
+//         for(int j = 0; j < 18; j++){
+//             printf("%c",dataCluster[ID].dir[i].filename[j]);
+//             printf("\n");
+//         }        
+//     }   
+// }
+// while(i == 32){
+//     int i;
+//     if(datacluster[id] == i){
+//         printf(data_cluster);
+//     }
+//     else
+//     i++;
+// }
 
 // init - inicializar o sistema de arquivos com as estruturas de dados, semelhante a formatar o sistema de
 // arquivos virtual
-//  load - carregar o sistema de arquivos do disco
-//  ls [/caminho/diretorio] - listar diretorio
-//  mkdir [/caminho/diretorio] - criar diretorio
-//  create [/caminho/arquivo] - criar arquivo
+//  load - carregar o sistema de arquivos do disco         FEITO
+//  ls [/caminho/diretorio] - listar diretorio           COMEÇOU
+//  mkdir [/caminho/diretorio] - criar diretorio         METADE
+//  create [/caminho/arquivo] - criar arquivo          
 //  unlink [/caminho/arquivo] - excluir arquivo ou diretorio (o diretorio precisa estar vazio)
-//  write "string"[/caminho/arquivo] - escrever dados em um arquivo (sobrescrever dados)
+//  write "string"[/caminho/arquivo] - escrever dados em um arquivo (sobrescrever dados)   
 //  append "string"[/caminho/arquivo] - anexar dados em um arquivo
-//  read [/caminho/arquivo] - ler o conteudo de um arquivo
+//  read [/caminho/arquivo] - ler o conteudo de um arquivo    
