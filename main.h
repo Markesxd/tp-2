@@ -29,6 +29,24 @@ typedef union{
 
 void initFat(uint16_t **fat);
 
+void initRootDir(data_cluster *root);
+
 int toInt(char word[10]);
 
 void printFat(uint16_t *fat);
+
+int navegate(data_cluster *dataCluster, char* path);
+
+int navegate1(char name[18], data_cluster cluster);
+
+void extractName(char* path,char name[20]);
+
+void makeDir(data_cluster **dataCluster, uint16_t *fat, char* path);
+
+void extractPath(char input[100], char command[10], char path[90]);
+
+void ls(data_cluster *dataCluster, char path[90]);
+
+void printDir(data_cluster *cluster, char path[90]);
+
+int locateInDir(char name[20], data_cluster cluster);

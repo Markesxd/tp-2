@@ -10,57 +10,54 @@ int main(){
     fat = (uint16_t*) malloc(sizeof(uint16_t) * 4096);
     data_cluster *clusters;
     clusters = (data_cluster*) malloc(sizeof(data_cluster) * 4087);
-    int i = 0;
-    char escolha[10];
+    initRootDir(&(clusters[0]));
+    char input[100], command[10], path[90];
     do{
-    printf(">");
-    scanf(" %s", escolha);
-    
-    switch(toInt(escolha)){
-        case INIT:
-            printf("init\n");
-            initFat(&fat);
-            printFat(fat);
-        break;
+        printf(">");
+        fgets(input, 100, stdin);
+        extractPath(input, command, path);
+        
+        switch(toInt(command)){
+            case INIT:
+                printf("init\n");
+                initFat(&fat);
+                printFat(fat);
+            break;
 
-        case LOAD:
-            printf("load\n");
-        break;
+            case LOAD:
+                printf("load\n");
+            break;
 
-        case LS:
-            printf("ls\n");
-        break;
+            case LS:
+                printDir(clusters, path);
+                // ls(clusters, path);
+            break;
 
-        case MKDIR:
-            if(i % 2 == 0){
-                clusters->data[0] 10;
-            } else {
-                clusters->dir->attributes = 1;
-            }
-            printf("mkdir\n");
-        break;
+            case MKDIR:
+                makeDir(&clusters, fat, path);
+            break;
 
-        case CREATE:
-            printf("create\n");
-        break;
+            case CREATE:
+                printf("create\n");
+            break;
 
-        case UNLINK:
-            printf("unlink\n");
-        break;
+            case UNLINK:
+                printf("unlink\n");
+            break;
 
-        case WRITE:
-            printf("write\n");
-        break;
+            case WRITE:
+                printf("write\n");
+            break;
 
-        case APPEND:
-            printf("append\n");
-        break;
+            case APPEND:
+                printf("append\n");
+            break;
 
-        case READ:
-            printf("read\n");
-        break;
-    }
-    }while(toInt(escolha) != QUIT);
+            case READ:
+                printf("read\n");
+            break;
+        }
+    }while(toInt(command) != QUIT);
     return 0;
 }
 
@@ -73,6 +70,29 @@ void initFat(uint16_t **fat){
     for(int i = 10; i < 4096; i++){
         (*fat)[i] = 0x0;
     }
+}
+
+void initRootDir(data_cluster *root){
+    for(int i = 0; i < 32; i++){
+        (*root).dir[i].size = 0;
+    }
+}
+
+void extractPath(char input[100], char command[10], char path[90]){
+    int i = 0, j = 0;
+    while(input[i] != ' '){
+    if(input[i] == '\n') {
+        command[i] = '\0';
+        path[0] = '/';
+        path[1] = '\0';  
+        return;
+    }
+    command[i] = input[i];
+    i++;
+    };
+    command[i++] = '\0';
+    while(input[i] != '\n') path[j++] = input[i++];
+    path[j] = '\0';
 }
 
 int toInt(char word[10]){
@@ -94,19 +114,51 @@ void printFat(uint16_t *fat){
     }
 }
 
-// void makeDir(data_cluster **dataCluster, uint16_t *fat, char* path){
-//     int dirI = navegate(dataCluster, path);
-//     int i = 0;
-//     strcpy((*dataCluster)[dirI].dir->filename, name); 
-//     while(fat[i] != 0x0) i++;
-//     fat[i] = 0xffff;
-// }
+void makeDir(data_cluster **dataCluster, uint16_t *fat, char path[90]){
+    int dirI = navegate(*dataCluster, path);
 
-int navigate(data_cluster *dataCluster, char* path){
+    char name[20];
+    extractName(path, name);
+
+    int newDirI = 0;
+    while(fat[newDirI] != 0x0) newDirI++;
+    fat[newDirI] = 0xffff;
+
+    int j = 0;
+    while((*dataCluster)[dirI].dir[j].size != 0 && j++ < 32);
+    if(j == 32){
+        printf("Diretorio cheio\n");
+        return;
+    }
+    strcpy((*dataCluster)[dirI].dir[j].filename, name);
+    (*dataCluster)[dirI].dir[j].attributes = 1;
+    (*dataCluster)[dirI].dir[j].first_block = newDirI;
+    (*dataCluster)[dirI].dir[j].size = 1;
+
+    for(int k = 0; k < 32; k++){
+        (*dataCluster)[newDirI].dir[k].size = 0;
+    }
+}
+
+void extractName(char path[90], char name[20]){
+    int i = strlen(path), j = 0;
+    char nameAux[20];
+    while(path[--i] != '/' && i >= 0){
+        nameAux[j++] = path[i];
+    }
+    i = 0;
+    while(--j >= 0){
+        name[i++] = nameAux[j];
+    }
+    name[i] = '\0';
+}
+
+int navegate(data_cluster *dataCluster, char *path){
     int k = 0, dirI = 0;
-    char name[18];
+    char name[19];
     for(int j = 1; j < strlen(path); j++){
         if(path[j] == '/') {
+            name[k] = '\0';
             dirI = navegate1(name, dataCluster[dirI]);
             k = 0;
         };    
@@ -115,9 +167,9 @@ int navigate(data_cluster *dataCluster, char* path){
     return dirI;
 }
 
-int navegate1(char name[18], data_cluster cluster){
+int navegate1(char name[19], data_cluster cluster){
     for(int i = 0; i < 32; i++){
-        if(strcmp(cluster.dir[i].filename, name) == 0) return i;
+        if(strcmp(cluster.dir[i].filename, name) == 0) return cluster.dir[i].first_block;
     }
     printf("Diretorio ou arquivo nao encontrado\n");
 }
@@ -147,15 +199,35 @@ void readFile(data_cluster **data_cluster, uint16_t **fat){
     fclose(pont_arq);
 }
 
-// void ls(data_cluster *dataCluster, char* path){
-//     int ID = navigate(dataCluster, path);
-//     for(int i = 0; i < 32; i++){
-//         for(int j = 0; j < 18; j++){
-//             printf("%c",dataCluster[ID].dir[i].filename[j]);
-//             printf("\n");
-//         }        
-//     }   
-// }
+void ls(data_cluster *dataCluster, char path[90]){
+    // int dirI = navigate(dataCluster, path);
+    int dirI = 0;
+    for(int i = 0; i < 32; i++){
+        if(dataCluster[dirI].dir[i].size == 0) continue;
+        printf("%s ",dataCluster[dirI].dir[i].filename);
+    }
+    printf("\n");
+}
+
+void printDir(data_cluster *clusters, char path[90]){
+    int dirI = navegate(clusters, path);
+    char name[20];
+    extractName(path, name);
+    int fileInDir = locateInDir(name, clusters[dirI]);
+    printf("%s\n", clusters[dirI].dir[fileInDir].filename);
+    printf("atribute: %d\n", clusters[dirI].dir[fileInDir].attributes);
+    printf("first block: %d\n", clusters[dirI].dir[fileInDir].first_block);
+    printf("size: %d\n", clusters[dirI].dir[fileInDir].size);
+}
+
+int locateInDir(char name[20], data_cluster cluster){
+    for(int i = 0; i < 32; i++){
+        if(strcmp(cluster.dir[i].filename, name) == 0) return i;
+    }
+    printf("No such file in directory\n");
+}
+
+
 // while(i == 32){
 //     int i;
 //     if(datacluster[id] == i){
