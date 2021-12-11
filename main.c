@@ -15,6 +15,7 @@ int main(){
     char input[100], command[10], path[90], string[50];
     int att;
     do{
+        printf("%ld", sizeof(char));
         printf(">");
         fgets(input, 100, stdin);
         extractPath(input, command, path);
@@ -36,16 +37,16 @@ int main(){
 
             case MKDIR:
                 att = 1;
-                create(&clusters, &fat, path, att);
+                make(&clusters, &fat, path, att);
             break;
 
             case CREATE:
                 att = 0;
-                create(&clusters, &fat, path, att);
+                make(&clusters, &fat, path, att);
             break;
 
             case UNLINK:
-                printf("unlink\n");
+                unlink(path, &clusters, &fat);
             break;
 
             case WRITE:
@@ -55,7 +56,7 @@ int main(){
 
             case APPEND:
                 extractString(string, path);
-                append(&clusters, path, string);
+                append(&clusters, path, string, &fat);
             break;
 
             case READ:
@@ -141,7 +142,7 @@ void printFat(uint16_t *fat){
     }
 }
 
-void create(data_cluster **dataCluster, uint16_t **fat, char path[90], int attribute){
+void make(data_cluster **dataCluster, uint16_t **fat, char path[90], int attribute){
     int dirI = navegate(*dataCluster, path);
 
     char name[20];
@@ -208,7 +209,6 @@ int navegate1(char name[19], data_cluster cluster){
     printf("Diretorio ou arquivo nao encontrado\n");
     return -1;
 }
-//fat.part
 
 void dataFlush(data_cluster *data_cluster, uint16_t *fat){
     FILE *pont_arq;
@@ -217,7 +217,7 @@ void dataFlush(data_cluster *data_cluster, uint16_t *fat){
     if (pont_arq == NULL){ //error file
         printf("arquivo com problemas");
     }
-    fwrite(fat, 4096, sizeof(fat), pont_arq);
+    fwrite(fat, 4096, sizeof(uint16_t), pont_arq);
     fwrite(data_cluster, 4087, sizeof(data_cluster), pont_arq);
     fclose(pont_arq);
 }
@@ -229,8 +229,8 @@ void readFile(data_cluster **data_cluster, uint16_t **fat){
     if(pont_arq == NULL){
         perror("failed to read file");
     }
-    fread(fat, sizeof(fat), 4096, pont_arq);
-    fread(*data_cluster,sizeof(data_cluster), 4087,pont_arq);
+    fread(*fat, sizeof(uint16_t), 4096, pont_arq);
+    fread(*data_cluster, sizeof(data_cluster), 4087,pont_arq);
     fclose(pont_arq);
 }
 
@@ -239,8 +239,8 @@ void ls(data_cluster *dataCluster, char path[90]){
     char name[20];
     extractName(path, name);
     if(strlen(name) == 1 && name[0] == '/'){} else {
-    int inDirI = locateInDir(name, dataCluster[dirI]);
-    dirI = dataCluster[dirI].dir[inDirI].first_block;
+        int inDirI = locateInDir(name, dataCluster[dirI]);
+        dirI = dataCluster[dirI].dir[inDirI].first_block;
     } 
     for(int i = 0; i < 32; i++){
         if(dataCluster[dirI].dir[i].size == 0) continue;
@@ -267,9 +267,8 @@ int locateInDir(char name[20], data_cluster cluster){
         if(strcmp(cluster.dir[i].filename, name) == 0) return i;
     }
     printf("No such file in directory\n");
+    return -1;
 }
-
-
 
 void write(data_cluster **dataCluster, char path[90], char str[30]){
     int id = navegate(*dataCluster, path);
@@ -277,6 +276,7 @@ void write(data_cluster **dataCluster, char path[90], char str[30]){
     extractName(path, name);
     int inDir = locateInDir(name, (*dataCluster)[id]);
     id = (*dataCluster)[id].dir[inDir].first_block;
+    (*dataCluster)[id].dir[inDir].size = strlen(str);
     if(str[0] == '\0'){
         printf("Empty string\n");
     }else{
@@ -293,36 +293,51 @@ void read(data_cluster *dataCluster, char path[90]){
     puts(dataCluster[id].data);
 }
 
-void append(data_cluster **dataCluster, char path[90], char str2[30]){
+void append(data_cluster **dataCluster, char path[90], char str[30], uint16_t **fat){
     int id = navegate(*dataCluster, path);
     char name[20];
+    char *str2;
     extractName(path, name);
     int inDir = locateInDir(name, (*dataCluster)[id]);
-    id = (*dataCluster)[id].dir[inDir].first_block;
-    if(str2[0] == '\0'){
+    int first = (*dataCluster)[id].dir[inDir].first_block;
+    int i = 0;
+    int size = (*dataCluster)[first].dir[inDir].size + strlen(str);
+    int newblock = first;
+    int oldblock = first;
+    while(size > CLUSTER_SIZE - 1){
+        newblock = 0;
+        int dif = size - CLUSTER_SIZE - 1 + i;
+        str2 = strndup(str + i, dif);
+        strcat((*dataCluster)[oldblock].data, str2);
+        i += dif;
+        while((*fat)[newblock++] != 0x0);
+        (*fat)[oldblock] = newblock;
+        oldblock = newblock;
+        (*fat)[newblock] = 0xffff;
+    }
+    (*dataCluster)[newblock].dir[inDir].size += strlen(str);
+    if(str[0] == '\0'){
         printf("Empty string\n");
     }else{
-        strcat((*dataCluster)[id].data, str2);
+        strcat((*dataCluster)[newblock].data, str);
     }
 }
 
-
-// while(i == 32){
-//     int i;
-//     if(datacluster[id] == i){
-//         printf(data_cluster);
-//     }
-//     else
-//     i++;
-// }
-
+void unlink(char path[90], data_cluster **clusters, uint16_t **fat){
+    char name[20];
+    int dirI = navegate(*clusters, path);
+    extractName(path, name);
+    int inDirI = locateInDir(name, (*clusters)[dirI]);
+    (*clusters)[dirI].dir[inDirI].size = 0;
+    (*fat)[inDirI] = 0x0;
+}
 // init - inicializar o sistema de arquivos com as estruturas de dados, semelhante a formatar o sistema de
-// arquivos virtual
-//  load - carregar o sistema de arquivos do disco      FEITO (TESTE)
+// arquivos virtual FEITO (APROVADO PELO INMETRO)
+//  load - carregar o sistema de arquivos do disco      FEITO (APROVADO PELO INMETRO)
 //  ls [/caminho/diretorio] - listar diretorio        FEITO (APROVADO PELO INMETRO)
 //  mkdir [/caminho/diretorio] - criar diretorio      FEITO (APROVADO PELO INMETRO)
 //  create [/caminho/arquivo] - criar arquivo           FEITO (APROVADO PELO INMETRO)
-//  unlink [/caminho/arquivo] - excluir arquivo ou diretorio (o diretorio precisa estar vazio)   FALTANDO
+//  unlink [/caminho/arquivo] - excluir arquivo ou diretorio (o diretorio precisa estar vazio)   FEITO (APROVADO PELO INMETRO)
 //  write "string"[/caminho/arquivo] - escrever dados em um arquivo (sobrescrever dados)             FEITO (APROVADO PELO INMETRO)
 //  append "string"[/caminho/arquivo] - anexar dados em um arquivo      FEITO (APROVADO PELO INMETRO)
 //  read [/caminho/arquivo] - ler o conteudo de um arquivo            FEITO (APROVADO PELO INMETRO)

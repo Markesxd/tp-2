@@ -41,7 +41,7 @@ int navegate1(char name[18], data_cluster cluster);
 
 void extractName(char* path,char name[20]);
 
-void create(data_cluster **dataCluster, uint16_t **fat, char* path, int attribute);
+void make(data_cluster **dataCluster, uint16_t **fat, char* path, int attribute);
 
 void extractPath(char input[100], char command[10], char path[90]);
 
@@ -53,7 +53,7 @@ int locateInDir(char name[20], data_cluster cluster);
 
 void extractString(char string[50], char path[90]);
 
-void append(data_cluster **dataCluster, char path[90], char str2[30]);
+void append(data_cluster **dataCluster, char path[90], char str[30], uint16_t **fat);
 
 void write(data_cluster **dataCluster, char path[90], char str[30]);
 
@@ -62,3 +62,5 @@ void read(data_cluster *dataCluster, char path[90]);
 void readFile(data_cluster **data_cluster, uint16_t **fat);
 
 void dataFlush(data_cluster *data_cluster, uint16_t *fat);
+
+void unlink(char path[90], data_cluster **clusters, uint16_t **fat);
